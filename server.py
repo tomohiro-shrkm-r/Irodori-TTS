@@ -52,6 +52,11 @@ class TTSParams(BaseModel):
     """Synthesis options. Defaults match the Gradio UI."""
 
     text: str = Field(min_length=1)
+    caption: str | None = Field(
+        default=None,
+        description="Voice-design style/caption. Requires a caption-conditioned checkpoint.",
+    )
+    max_caption_len: int | None = Field(default=None, ge=1)
     seed: int | None = None
     num_steps: int | None = Field(default=None, ge=1)
     seconds: float | None = Field(default=None, gt=0)
@@ -60,6 +65,7 @@ class TTSParams(BaseModel):
     sway_coeff: float = -1.0
     cfg_guidance_mode: Literal["independent", "joint", "alternating"] = "independent"
     cfg_scale_text: float = 3.0
+    cfg_scale_caption: float = 3.0
     cfg_scale_speaker: float = 5.0
     cfg_scale: float | None = None
     cfg_min_t: float = 0.5
@@ -113,7 +119,16 @@ def _resolve_asset(base: Path | None, name: str | None, label: str, *, is_dir: b
     return str(target)
 
 
+def _reject_non_utf8(label: str, value: str | None) -> None:
+    # Starlette decodes non-UTF-8 form fields as latin-1, which turns e.g. Shift_JIS lead bytes
+    # into C1 control characters that never occur in real text.
+    if value is not None and any("\x80" <= ch <= "\x9f" for ch in value):
+        raise ValueError(f"{label} is not valid UTF-8. Send the request body encoded as UTF-8.")
+
+
 def _build_request(params: TTSParams, ref_wavs: list[str], dirs: AssetDirs) -> SamplingRequest:
+    _reject_non_utf8("text", params.text)
+    _reject_non_utf8("caption", params.caption)
     speaker_embedding = _resolve_asset(
         dirs.speaker_dir, params.speaker_embedding, "speaker", is_dir=False
     )
@@ -122,6 +137,8 @@ def _build_request(params: TTSParams, ref_wavs: list[str], dirs: AssetDirs) -> S
         raise ValueError("Reference audio and speaker_embedding are mutually exclusive.")
     return SamplingRequest(
         text=params.text,
+        caption=params.caption,
+        max_caption_len=params.max_caption_len,
         ref_wavs=ref_wavs or None,
         ref_embed=speaker_embedding,
         no_ref=not ref_wavs and speaker_embedding is None,
@@ -135,6 +152,7 @@ def _build_request(params: TTSParams, ref_wavs: list[str], dirs: AssetDirs) -> S
         seed=params.seed,
         cfg_guidance_mode=params.cfg_guidance_mode,
         cfg_scale_text=params.cfg_scale_text,
+        cfg_scale_caption=params.cfg_scale_caption,
         cfg_scale_speaker=params.cfg_scale_speaker,
         cfg_scale=params.cfg_scale,
         cfg_min_t=params.cfg_min_t,

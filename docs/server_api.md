@@ -57,6 +57,15 @@ curl -X POST http://HOST:7860/api/tts \
   -o out.wav
 ```
 
+caption を指定すると声質・スタイルを制御できる（caption 対応チェックポイントのみ）。
+
+```bash
+curl -X POST http://HOST:7860/api/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "あははっ、それ本当に言ってるの？", "caption": "余裕のある大人の男性。くだけた雰囲気で楽しそうに話している。"}' \
+  -o out.wav
+```
+
 ### パラメータ
 
 `text` 以外は省略可。既定値は Gradio UI と同じ。各パラメータの意味は [parameters.md](parameters.md) を参照。
@@ -64,6 +73,8 @@ curl -X POST http://HOST:7860/api/tts \
 | 名前 | 型 | 既定値 | 備考 |
 |---|---|---|---|
 | `text` | string | （必須） | 1 文字以上 |
+| `caption` | string \| null | `null` | 声質・スタイルを指定する VoiceDesign キャプション。caption 対応チェックポイントが必要 |
+| `max_caption_len` | int \| null | `null` | `null` はチェックポイントの既定値。1 以上 |
 | `seed` | int \| null | `null` | `null` はランダム。使われた値はレスポンスヘッダ `X-Seed` |
 | `num_steps` | int \| null | `null` | `null` はチェックポイントの推奨値。1 以上 |
 | `seconds` | float \| null | `null` | `null` は自動推定 |
@@ -72,8 +83,9 @@ curl -X POST http://HOST:7860/api/tts \
 | `sway_coeff` | float | `-1.0` | `sway` 時のみ有効 |
 | `cfg_guidance_mode` | `"independent"` \| `"joint"` \| `"alternating"` | `"independent"` | |
 | `cfg_scale_text` | float | `3.0` | |
+| `cfg_scale_caption` | float | `3.0` | |
 | `cfg_scale_speaker` | float | `5.0` | |
-| `cfg_scale` | float \| null | `null` | 指定すると text/speaker 両方を上書き |
+| `cfg_scale` | float \| null | `null` | 指定すると text/caption/speaker 全てを上書き |
 | `cfg_min_t` | float | `0.5` | |
 | `cfg_max_t` | float | `1.0` | |
 | `context_kv_cache` | bool | `true` | |
@@ -141,5 +153,5 @@ with open("voice.wav", "rb") as f:
 ## 注意
 
 - リクエストは 1 件ずつ順に処理される（runtime 内部でロック）。同時に送ると後続は待たされる。
-- Windows の Git Bash で `-d` に日本語を直接書くと文字コードの問題で `400` になる。UTF-8 のファイルを `--data-binary @req.json` で送る。
+- Windows の Git Bash で curl の引数に日本語を直接書くと、Shift_JIS で送られて `400` になる（`-d` も `-F` も同じ）。JSON は UTF-8 のファイルを `--data-binary @req.json` で、multipart は `-F "text=<text.txt"` のように UTF-8 のファイルから値を読ませる。
 - `--api-key` は Gradio UI を保護しない。UI からは任意のチェックポイント・LoRA パスを指定できるため、信頼できないネットワークに公開しない。
