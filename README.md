@@ -117,6 +117,26 @@ Open `http://localhost:7861`. Both UIs default to `Aratako/Irodori-TTS-v4.1-Smal
 The hosted [v4.1-Small demo](https://huggingface.co/spaces/Aratako/Irodori-TTS-v4.1-Small-Demo)
 also supports caption and reference-audio conditioning.
 
+### REST API Server
+
+`server.py` serves the Gradio UI at `/` and a REST API at `/api` from one process, sharing one
+loaded model:
+
+```bash
+uv run --no-sync python server.py --host 0.0.0.0 --port 7860 --preload
+```
+
+```bash
+curl -X POST http://localhost:7860/api/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "こんにちは、私はAIです。", "seed": 42}' \
+  -o out.wav
+```
+
+Use `POST /api/tts/ref` (multipart, `ref_audio` files) for reference-audio cloning. Interactive
+docs are at `http://localhost:7860/docs`. See [docs/server_api.md](docs/server_api.md) for all
+parameters and options.
+
 ## Inference
 
 ### Local Checkpoints
@@ -499,13 +519,15 @@ Irodori-TTS/
 ├── infer.py                    # CLI inference
 ├── gradio_app.py               # Gradio web UI
 ├── gradio_app_voicedesign.py   # Gradio web UI for VoiceDesign checkpoints
+├── server.py                   # Gradio UI + REST API server
 ├── prepare_manifest.py         # Dataset -> DACVAE latent preprocessing
 ├── convert_checkpoint_to_safetensors.py  # Checkpoint converter
 ├── quantize_checkpoint.py      # torchao checkpoint quantization
 │
 ├── docs/
 │   ├── meanflow.md           # MeanFlow inference and distillation guide
-│   └── parameters.md         # Detailed parameter guide
+│   ├── parameters.md         # Detailed parameter guide
+│   └── server_api.md         # REST API server guide
 │
 ├── irodori_tts/                # Core library
 │   ├── attention.py            # Mask-aware SDPA and optional FlashAttention-3 dispatch
